@@ -24,8 +24,7 @@ export default function TestTeamCreate() {
         .from('teams')
         .insert({
           organization_id: TEST_ORG_ID,
-          name: data.name,
-          description: data.description || null
+          name: data.name
         })
         .select()
 
