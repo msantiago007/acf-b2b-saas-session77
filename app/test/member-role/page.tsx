@@ -2,13 +2,8 @@
 
 import { useState } from 'react'
 import { MemberRoleForm } from '@/components/MemberRoleForm'
-import { createBrowserClient } from '@supabase/ssr'
 
 export default function TestMemberRole() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [members, setMembers] = useState<any[]>([])
 
@@ -19,23 +14,26 @@ export default function TestMemberRole() {
     try {
       setStatus({ type: 'info', message: 'Updating member role...' })
 
-      // Update organization_member in Supabase
-      const { error, data: updatedMember } = await supabase
-        .from('organization_members')
-        .update({
+      // Update member role via API route (uses service role key)
+      const response = await fetch(`/api/orgs/${TEST_ORG_ID}/members/${data.user_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           role: data.role
-        })
-        .eq('organization_id', TEST_ORG_ID)
-        .eq('user_id', data.user_id)
-        .select()
+        }),
+      })
 
-      if (error) {
-        console.error('Update failed:', error)
-        setStatus({ type: 'error', message: `Update failed: ${error.message}` })
-        throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error('Update failed:', result)
+        setStatus({ type: 'error', message: `Update failed: ${result.error?.message || 'Unknown error'}` })
+        throw new Error(result.error?.message || 'Update failed')
       }
 
-      console.log('Role updated:', updatedMember)
+      console.log('Role updated:', result)
       setStatus({ type: 'success', message: `Role updated to "${data.role}" successfully!` })
 
       // Reload members list
@@ -48,19 +46,23 @@ export default function TestMemberRole() {
   }
 
   const loadMembers = async () => {
-    const { data, error } = await supabase
-      .from('organization_members')
-      .select('*')
-      .eq('organization_id', TEST_ORG_ID)
-      .order('created_at', { ascending: false })
+    try {
+      // Load members via API route (uses service role key to bypass RLS)
+      const response = await fetch(`/api/orgs/${TEST_ORG_ID}/members`)
+      const result = await response.json()
 
-    if (error) {
-      console.error('Load failed:', error)
-      setStatus({ type: 'error', message: `Load failed: ${error.message}` })
-    } else {
-      console.log('Current members:', data)
-      setMembers(data || [])
-      setStatus({ type: 'success', message: `Loaded ${data?.length || 0} members from database` })
+      if (!response.ok) {
+        console.error('Load failed:', result)
+        setStatus({ type: 'error', message: `Load failed: ${result.error?.message || 'Unknown error'}` })
+        return
+      }
+
+      console.log('Current members:', result.data?.members)
+      setMembers(result.data?.members || [])
+      setStatus({ type: 'success', message: `Loaded ${result.data?.members?.length || 0} members from database` })
+    } catch (err) {
+      console.error('Load error:', err)
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 

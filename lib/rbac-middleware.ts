@@ -281,3 +281,65 @@ export function withOptionalAuth(
     return handler(authReq, context)
   }
 }
+
+/**
+ * RBAC middleware with permission checking
+ * Validates user authentication, membership, and permissions
+ *
+ * @param req - NextRequest object
+ * @param orgId - Organization ID
+ * @param permissions - Array of required permissions (user needs at least one)
+ * @param callback - Callback function with auth context
+ * @returns Response from callback or error response
+ *
+ * @example
+ * return withRbac(req, params.orgId, ['read'], async (context) => {
+ *   // context.user, context.membership, context.org are available
+ *   return successResponse({ data: 'success' })
+ * })
+ */
+export async function withRbac(
+  req: NextRequest,
+  orgId: string,
+  permissions: Permission[],
+  callback: (context: {
+    user: User
+    membership: Membership
+    org: Organization
+  }) => Promise<Response>
+): Promise<Response> {
+  // Get user from session
+  const user = await getUser(req)
+  if (!user) {
+    throw new Error('Unauthorized - Please log in')
+  }
+
+  // Validate organization ID
+  if (!orgId) {
+    throw new Error('Organization ID required')
+  }
+
+  // Get membership
+  const membership = await getMembership(user.id, orgId)
+  if (!membership) {
+    throw new Error('Not a member of this organization')
+  }
+
+  // Check if user has at least one of the required permissions
+  const hasAnyPermission = permissions.some(permission =>
+    hasPermission(membership.role, permission)
+  )
+
+  if (!hasAnyPermission) {
+    throw new Error(
+      `Requires one of these permissions: ${permissions.join(', ')}`
+    )
+  }
+
+  // Call callback with auth context
+  return callback({
+    user,
+    membership,
+    org: membership.organization!,
+  })
+}

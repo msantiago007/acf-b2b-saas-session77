@@ -2,13 +2,8 @@
 
 import { useState } from 'react'
 import { OrganizationSettingsForm } from '@/components/OrganizationSettingsForm'
-import { createBrowserClient } from '@supabase/ssr'
 
 export default function TestOrgSettings() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [dbData, setDbData] = useState<any>(null)
 
@@ -19,27 +14,30 @@ export default function TestOrgSettings() {
     try {
       setStatus({ type: 'info', message: 'Updating organization...' })
 
-      // Update organization in Supabase
-      const { error, data: updatedData } = await supabase
-        .from('organizations')
-        .update({
+      // Update organization via API route (uses service role key)
+      const response = await fetch(`/api/orgs/${TEST_ORG_ID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: data.name,
-          slug: data.slug,
           plan: data.plan,
           settings: typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings
-        })
-        .eq('id', TEST_ORG_ID)
-        .select()
+        }),
+      })
 
-      if (error) {
-        console.error('Update failed:', error)
-        setStatus({ type: 'error', message: `Update failed: ${error.message}` })
-        throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error('Update failed:', result)
+        setStatus({ type: 'error', message: `Update failed: ${result.error?.message || 'Unknown error'}` })
+        throw new Error(result.error?.message || 'Update failed')
       }
 
-      console.log('Update successful:', updatedData)
+      console.log('Update successful:', result)
       setStatus({ type: 'success', message: 'Organization updated successfully!' })
-      setDbData(updatedData)
+      setDbData(result.data?.organization)
     } catch (err) {
       console.error('Submission error:', err)
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Unknown error' })
@@ -48,19 +46,23 @@ export default function TestOrgSettings() {
   }
 
   const loadCurrentData = async () => {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('id', TEST_ORG_ID)
-      .single()
+    try {
+      // Load organization via API route (uses service role key to bypass RLS)
+      const response = await fetch(`/api/orgs/${TEST_ORG_ID}`)
+      const result = await response.json()
 
-    if (error) {
-      console.error('Load failed:', error)
-      setStatus({ type: 'error', message: `Load failed: ${error.message}` })
-    } else {
-      console.log('Current data:', data)
-      setDbData(data)
+      if (!response.ok) {
+        console.error('Load failed:', result)
+        setStatus({ type: 'error', message: `Load failed: ${result.error?.message || 'Unknown error'}` })
+        return
+      }
+
+      console.log('Current data:', result.data?.organization)
+      setDbData(result.data?.organization)
       setStatus({ type: 'success', message: 'Data loaded from database' })
+    } catch (err) {
+      console.error('Load error:', err)
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
