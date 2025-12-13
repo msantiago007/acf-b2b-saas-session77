@@ -3,7 +3,10 @@
  *
  * Provides consistent error handling and response formatting for API routes.
  * Created: Session 80
+ * Updated: Session 81 - Added structured logging
  */
+
+import { logError } from './logger'
 
 export class ApiError extends Error {
   constructor(
@@ -32,8 +35,14 @@ export interface ApiSuccessResponse<T = any> {
 /**
  * Handles errors in API routes and returns appropriate Response
  */
-export function handleApiError(error: unknown): Response {
-  console.error('API Error:', error);
+export function handleApiError(error: unknown, context?: Record<string, any>): Response {
+  // Convert error to Error instance if needed
+  const errorObj = error instanceof Error
+    ? error
+    : new Error(typeof error === 'string' ? error : 'Unknown error')
+
+  // Log error with context using structured logger
+  logError(errorObj, context)
 
   if (error instanceof ApiError) {
     return Response.json(
@@ -137,6 +146,7 @@ export const ApiErrors = {
 };
 
 /**
+ * @deprecated Use logApiRequest from './logger' instead
  * Logs API requests for debugging and monitoring
  */
 export function logApiRequest(
@@ -145,16 +155,14 @@ export function logApiRequest(
   userId?: string,
   orgId?: string
 ): void {
-  console.log({
-    timestamp: new Date().toISOString(),
-    method,
-    path,
-    userId,
-    orgId,
-  });
+  // Import dynamically to avoid circular dependency
+  import('./logger').then(({ logApiRequest: newLogger }) => {
+    newLogger(method, path, userId, orgId)
+  })
 }
 
 /**
+ * @deprecated Use logApiRequest from './logger' instead
  * Logs API responses for debugging and monitoring
  */
 export function logApiResponse(
@@ -163,11 +171,8 @@ export function logApiResponse(
   status: number,
   duration: number
 ): void {
-  console.log({
-    timestamp: new Date().toISOString(),
-    method,
-    path,
-    status,
-    duration: `${duration}ms`,
-  });
+  // Import dynamically to avoid circular dependency
+  import('./logger').then(({ logApiRequest: newLogger }) => {
+    newLogger(method, path, undefined, undefined, duration, status)
+  })
 }
