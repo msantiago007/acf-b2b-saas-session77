@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
-    "@supabase/supabase-js": "^2.38.4",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.87.1",
     "next": "14.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

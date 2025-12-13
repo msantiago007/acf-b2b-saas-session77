@@ -2,10 +2,13 @@
 
 import { useState } from 'react'
 import { OrganizationSettingsForm } from '@/components/OrganizationSettingsForm'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function TestOrgSettings() {
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [dbData, setDbData] = useState<any>(null)
 
