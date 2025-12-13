@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
 import { hasPermission, hasRoleLevel, OrgRole, Permission } from './permissions'
 
 // Types
@@ -40,28 +41,23 @@ export interface AuthenticatedRequest extends NextRequest {
 
 /**
  * Get authenticated user from request
- * Uses Supabase Auth session
+ * Uses Supabase Auth session with proper SSR cookie handling
  *
  * @param req - Next.js request
  * @returns User object or null
  */
 async function getUser(req: NextRequest): Promise<User | null> {
-  // Get session from cookie (Supabase sets auth cookie)
-  const authCookie = req.cookies.get('sb-access-token')?.value
-
-  if (!authCookie) {
-    return null
-  }
-
-  // Initialize Supabase client
-  const supabase = createClient(
+  // Create server client with proper cookie handling
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      global: {
-        headers: {
-          Authorization: `Bearer ${authCookie}`,
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value
         },
+        set() {},
+        remove() {},
       },
     }
   )
